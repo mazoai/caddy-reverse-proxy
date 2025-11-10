@@ -79,8 +79,36 @@
 			# configure passive health checks
 			import passive_health_checks
 
+		# sets the Host header to the header to the dynamic name and port options
+		header_up Host {upstream_hostport}
+	}
+
+	# handle /database-api/* requests
+	# the handle_path directive WILL strip /database-api from the path before proxying
+	# use `handle` instead of `handle_path` if you dont want to strip the /database-api path
+	handle_path /database-api/* {
+		# the /database-api prefix WILL be stripped from the uri sent to the proxy host
+		#
+		# proxy all requests for /database-api/* to the database api service
+		reverse_proxy {
+			# for private networking replicas are exposed as multiple dns results, use those dns results as the upstreams
+			dynamic a {
+				name {$DATABASE_API_DOMAIN}
+				port {$DATABASE_API_PORT}
+				refresh 1s
+				dial_timeout 30s
+				versions ipv4 ipv6
+			}
+
+			# configure load balancing settings
+			import lb_settings
+
+			# configure passive health checks
+			import passive_health_checks
+
 			# sets the Host header to the header to the dynamic name and port options
 			header_up Host {upstream_hostport}
 		}
 	}
+}
 }
