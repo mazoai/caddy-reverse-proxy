@@ -34,67 +34,72 @@
 		format json # set access log format to json mode
 	}
 
-	# proxy all requests for /* to the frontend, configure these variables in the service settings
-	reverse_proxy {
-		# for private networking replicas are exposed as multiple dns results, use those dns results as the upstreams
-		dynamic a {
-			name {$FRONTEND_DOMAIN}
-			port {$FRONTEND_PORT}
-			refresh 1s
-			dial_timeout 30s
-			versions ipv4 ipv6
+	# use route to ensure proper order of request handling
+	route {
+		# the handle_path directive WILL strip /api/ from the path before proxying
+		# use `handle` instead of `handle_path` if you dont want to strip the /api/ path
+		# this is needed if your backend's api routes don't start with /api/
+		# change paths as needed
+		handle_path {$BACKEND_PATH:/api}/* {
+			# the /api/ prefix WILL be stripped from the uri sent to the proxy host
+			#
+			# proxy all requests for /api/* to the backend, configure this variable in the service settings
+			reverse_proxy {
+				# for private networking replicas are exposed as multiple dns results, use those dns results as the upstreams
+				dynamic a {
+					name {$BACKEND_DOMAIN}
+					port {$BACKEND_PORT}
+					refresh 1s
+					dial_timeout 30s
+					versions ipv4 ipv6
+				}
+
+				# configure load balancing settings
+				import lb_settings
+
+				# configure passive health checks
+				import passive_health_checks
+
+				# sets the Host header to the header to the dynamic name and port options
+				header_up Host {upstream_hostport}
+			}
 		}
 
-		# configure load balancing settings
-		import lb_settings
+		# handle /database-api/* requests
+		# the handle_path directive WILL strip /database-api from the path before proxying
+		# use `handle` instead of `handle_path` if you dont want to strip the /database-api path
+		handle_path {$DATABASE_API_PATH:/database-api}/* {
+			# the /database-api prefix WILL be stripped from the uri sent to the proxy host
+			#
+			# proxy all requests for /database-api/* to the database api service
+			reverse_proxy {
+				# for private networking replicas are exposed as multiple dns results, use those dns results as the upstreams
+				dynamic a {
+					name {$DATABASE_API_DOMAIN}
+					port {$DATABASE_API_PORT}
+					refresh 1s
+					dial_timeout 30s
+					versions ipv4 ipv6
+				}
 
-		# configure passive health checks
-		import passive_health_checks
+				# configure load balancing settings
+				import lb_settings
 
-		# sets the Host header to the header to the dynamic name and port options
-		header_up Host {upstream_hostport}
-	}
+				# configure passive health checks
+				import passive_health_checks
 
-	# the handle_path directive WILL strip /api/ from the path before proxying
-	# use `handle` instead of `handle_path` if you dont want to strip the /api/ path
-	# this is needed if your backend's api routes don't start with /api/
-	# change paths as needed
-	handle_path {$BACKEND_PATH:/api}/* {
-		# the /api/ prefix WILL be stripped from the uri sent to the proxy host
-		#
-		# proxy all requests for /api/* to the backend, configure this variable in the service settings
-		reverse_proxy {
-			# for private networking replicas are exposed as multiple dns results, use those dns results as the upstreams
-			dynamic a {
-				name {$BACKEND_DOMAIN}
-				port {$BACKEND_PORT}
-				refresh 1s
-				dial_timeout 30s
-				versions ipv4 ipv6
+				# sets the Host header to the header to the dynamic name and port options
+				header_up Host {upstream_hostport}
 			}
+		}
 
-			# configure load balancing settings
-			import lb_settings
-
-			# configure passive health checks
-			import passive_health_checks
-
-		# sets the Host header to the header to the dynamic name and port options
-		header_up Host {upstream_hostport}
-	}
-
-	# handle /database-api/* requests
-	# the handle_path directive WILL strip /database-api from the path before proxying
-	# use `handle` instead of `handle_path` if you dont want to strip the /database-api path
-	handle_path {$DATABASE_API_PATH:/database-api}/* {
-		# the /database-api prefix WILL be stripped from the uri sent to the proxy host
-		#
-		# proxy all requests for /database-api/* to the database api service
+		# proxy all other requests for /* to the frontend (must be last in route)
+		# configure these variables in the service settings
 		reverse_proxy {
 			# for private networking replicas are exposed as multiple dns results, use those dns results as the upstreams
 			dynamic a {
-				name {$DATABASE_API_DOMAIN}
-				port {$DATABASE_API_PORT}
+				name {$FRONTEND_DOMAIN}
+				port {$FRONTEND_PORT}
 				refresh 1s
 				dial_timeout 30s
 				versions ipv4 ipv6
@@ -110,5 +115,4 @@
 			header_up Host {upstream_hostport}
 		}
 	}
-}
 }
