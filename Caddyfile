@@ -86,7 +86,7 @@
 	# handle /database-api/* requests
 	# the handle_path directive WILL strip /database-api from the path before proxying
 	# use `handle` instead of `handle_path` if you dont want to strip the /database-api path
-	handle_path /database-api/* {
+	handle_path {$DATABASE_API_PATH:/database-api}/* {
 		# the /database-api prefix WILL be stripped from the uri sent to the proxy host
 		#
 		# proxy all requests for /database-api/* to the database api service
